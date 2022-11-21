@@ -1,0 +1,223 @@
+From d7caa351e2dada0d493fd745bbd6a00f0e3f2d66 Mon Sep 17 00:00:00 2001
+From: tytan652 <tytan652@tytanium.xyz>
+Date: Thu, 17 Feb 2022 20:21:33 +0100
+Subject: [PATCH] Revert "lavd: Remove libndi_newtek"
+
+This reverts commit 4b32f8b3ebfa011fcc5991bcaa97c3f5b61b49ad.
+---
+ configure                |  7 +++++
+ doc/indevs.texi          | 65 ++++++++++++++++++++++++++++++++++++++++
+ doc/outdevs.texi         | 45 ++++++++++++++++++++++++++++
+ libavdevice/Makefile     |  4 +++
+ libavdevice/alldevices.c |  2 ++
+ 5 files changed, 123 insertions(+)
+
+diff --git a/configure b/configure
+index 1535dc3c5b..dcfc925814 100755
+--- a/configure
++++ b/configure
+@@ -306,6 +306,7 @@ External library support:
+   --enable-lv2             enable LV2 audio filtering [no]
+   --disable-lzma           disable lzma [autodetect]
+   --enable-decklink        enable Blackmagic DeckLink I/O support [no]
++  --enable-libndi_newtek   enable Newteck NDI I/O support [no]
+   --enable-mbedtls         enable mbedTLS, needed for https support
+                            if openssl, gnutls or libtls is not used [no]
+   --enable-mediacodec      enable Android MediaCodec support [no]
+@@ -1784,6 +1785,7 @@ EXTERNAL_LIBRARY_GPL_LIST="
+ 
+ EXTERNAL_LIBRARY_NONFREE_LIST="
+     decklink
++    libndi_newtek
+     libfdk_aac
+     libtls
+ "
+@@ -3496,6 +3498,10 @@ decklink_indev_suggest="libzvbi"
+ decklink_outdev_deps="decklink threads"
+ decklink_outdev_suggest="libklvanc"
+ decklink_outdev_extralibs="-lstdc++"
++libndi_newtek_indev_deps="libndi_newtek"
++libndi_newtek_indev_extralibs="-lndi"
++libndi_newtek_outdev_deps="libndi_newtek"
++libndi_newtek_outdev_extralibs="-lndi"
+ dshow_indev_deps="IBaseFilter"
+ dshow_indev_extralibs="-lpsapi -lole32 -lstrmiids -luuid -loleaut32 -lshlwapi"
+ fbdev_indev_deps="linux_fb_h"
+@@ -6493,6 +6499,7 @@ enabled cuda_nvcc         && { check_nvcc cuda_nvcc || die "ERROR: failed checki
+ enabled chromaprint       && require chromaprint chromaprint.h chromaprint_get_version -lchromaprint
+ enabled decklink          && { require_headers DeckLinkAPI.h &&
+                                { test_cpp_condition DeckLinkAPIVersion.h "BLACKMAGIC_DECKLINK_API_VERSION >= 0x0a0b0000" || die "ERROR: Decklink API version must be >= 10.11"; } }
++enabled libndi_newtek     && require_headers Processing.NDI.Lib.h
+ enabled frei0r            && require_headers "frei0r.h"
+ enabled gmp               && require gmp gmp.h mpz_export -lgmp
+ enabled gnutls            && require_pkg_config gnutls gnutls gnutls/gnutls.h gnutls_global_init
+diff --git a/doc/indevs.texi b/doc/indevs.texi
+index 9d8020311a..6e1ed98dc0 100644
+--- a/doc/indevs.texi
++++ b/doc/indevs.texi
+@@ -1136,6 +1136,71 @@ Set the video size given as a string such as @code{640x480} or @code{hd720}.
+ Default is @code{qvga}.
+ @end table
+ 
++@section libndi_newtek
++
++The libndi_newtek input device provides capture capabilities for using NDI (Network
++Device Interface, standard created by NewTek).
++
++Input filename is a NDI source name that could be found by sending -find_sources 1
++to command line - it has no specific syntax but human-readable formatted.
++
++To enable this input device, you need the NDI SDK and you
++need to configure with the appropriate @code{--extra-cflags}
++and @code{--extra-ldflags}.
++
++@subsection Options
++
++@table @option
++
++@item find_sources
++If set to @option{true}, print a list of found/available NDI sources and exit.
++Defaults to @option{false}.
++
++@item wait_sources
++Override time to wait until the number of online sources have changed.
++Defaults to @option{0.5}.
++
++@item allow_video_fields
++When this flag is @option{false}, all video that you receive will be progressive.
++Defaults to @option{true}.
++
++@item extra_ips
++If is set to list of comma separated ip addresses, scan for sources not only
++using mDNS but also use unicast ip addresses specified by this list.
++
++@end table
++
++@subsection Examples
++
++@itemize
++
++@item
++List input devices:
++@example
++ffmpeg -f libndi_newtek -find_sources 1 -i dummy
++@end example
++
++@item
++List local and remote input devices:
++@example
++ffmpeg -f libndi_newtek -extra_ips "192.168.10.10" -find_sources 1 -i dummy
++@end example
++
++@item
++Restream to NDI:
++@example
++ffmpeg -f libndi_newtek -i "DEV-5.INTERNAL.M1STEREO.TV (NDI_SOURCE_NAME_1)" -f libndi_newtek -y NDI_SOURCE_NAME_2
++@end example
++
++@item
++Restream remote NDI to local NDI:
++@example
++ffmpeg -f libndi_newtek -extra_ips "192.168.10.10" -i "DEV-5.REMOTE.M1STEREO.TV (NDI_SOURCE_NAME_1)" -f libndi_newtek -y NDI_SOURCE_NAME_2
++@end example
++
++
++@end itemize
++
+ @section openal
+ 
+ The OpenAL input device provides audio capture on all systems with a
+diff --git a/doc/outdevs.texi b/doc/outdevs.texi
+index aa41e29523..b4fad47950 100644
+--- a/doc/outdevs.texi
++++ b/doc/outdevs.texi
+@@ -296,6 +296,51 @@ ffmpeg -re -i INPUT -c:v rawvideo -pix_fmt bgra -f fbdev /dev/fb0
+ 
+ See also @url{http://linux-fbdev.sourceforge.net/}, and fbset(1).
+ 
++@section libndi_newtek
++
++The libndi_newtek output device provides playback capabilities for using NDI (Network
++Device Interface, standard created by NewTek).
++
++Output filename is a NDI name.
++
++To enable this output device, you need the NDI SDK and you
++need to configure with the appropriate @code{--extra-cflags}
++and @code{--extra-ldflags}.
++
++NDI uses uyvy422 pixel format natively, but also supports bgra, bgr0, rgba and
++rgb0.
++
++@subsection Options
++
++@table @option
++
++@item reference_level
++The audio reference level in dB. This specifies how many dB above the
++reference level (+4dBU) is the full range of 16 bit audio.
++Defaults to @option{0}.
++
++@item clock_video
++These specify whether video "clock" themselves.
++Defaults to @option{false}.
++
++@item clock_audio
++These specify whether audio "clock" themselves.
++Defaults to @option{false}.
++
++@end table
++
++@subsection Examples
++
++@itemize
++
++@item
++Play video clip:
++@example
++ffmpeg -i "udp://@@239.1.1.1:10480?fifo_size=1000000&overrun_nonfatal=1" -vf "scale=720:576,fps=fps=25,setdar=dar=16/9,format=pix_fmts=uyvy422" -f libndi_newtek NEW_NDI1
++@end example
++
++@end itemize
++
+ @section opengl
+ OpenGL output device.
+ 
+diff --git a/libavdevice/Makefile b/libavdevice/Makefile
+index 53efda0514..8bef2a2f73 100644
+--- a/libavdevice/Makefile
++++ b/libavdevice/Makefile
+@@ -20,6 +20,8 @@ OBJS-$(CONFIG_BKTR_INDEV)                += bktr.o
+ OBJS-$(CONFIG_CACA_OUTDEV)               += caca.o
+ OBJS-$(CONFIG_DECKLINK_OUTDEV)           += decklink_enc.o decklink_enc_c.o decklink_common.o
+ OBJS-$(CONFIG_DECKLINK_INDEV)            += decklink_dec.o decklink_dec_c.o decklink_common.o
++OBJS-$(CONFIG_LIBNDI_NEWTEK_OUTDEV)      += libndi_newtek_enc.o
++OBJS-$(CONFIG_LIBNDI_NEWTEK_INDEV)       += libndi_newtek_dec.o
+ OBJS-$(CONFIG_DSHOW_INDEV)               += dshow_crossbar.o dshow.o dshow_enummediatypes.o \
+                                             dshow_enumpins.o dshow_filter.o \
+                                             dshow_pin.o dshow_common.o
+@@ -62,6 +64,8 @@ SLIBOBJS-$(HAVE_GNU_WINDRES)             += avdeviceres.o
+ SKIPHEADERS                              += decklink_common.h
+ SKIPHEADERS-$(CONFIG_DECKLINK)           += decklink_enc.h decklink_dec.h \
+                                             decklink_common_c.h
++SKIPHEADERS-$(CONFIG_LIBNDI_NEWTEK_INDEV) += libndi_newtek_common.h
++SKIPHEADERS-$(CONFIG_LIBNDI_NEWTEK_OUTDEV) += libndi_newtek_common.h
+ SKIPHEADERS-$(CONFIG_DSHOW_INDEV)        += dshow_capture.h
+ SKIPHEADERS-$(CONFIG_FBDEV_INDEV)        += fbdev_common.h
+ SKIPHEADERS-$(CONFIG_FBDEV_OUTDEV)       += fbdev_common.h
+diff --git a/libavdevice/alldevices.c b/libavdevice/alldevices.c
+index 22323a0a44..5ffd97fca7 100644
+--- a/libavdevice/alldevices.c
++++ b/libavdevice/alldevices.c
+@@ -31,6 +31,8 @@ extern const AVInputFormat  ff_bktr_demuxer;
+ extern const AVOutputFormat ff_caca_muxer;
+ extern const AVInputFormat  ff_decklink_demuxer;
+ extern const AVOutputFormat ff_decklink_muxer;
++extern const AVInputFormat  ff_libndi_newtek_demuxer;
++extern const AVOutputFormat ff_libndi_newtek_muxer;
+ extern const AVInputFormat  ff_dshow_demuxer;
+ extern const AVInputFormat  ff_fbdev_demuxer;
+ extern const AVOutputFormat ff_fbdev_muxer;
+-- 
+2.35.1
+
