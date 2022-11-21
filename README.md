@@ -111,3 +111,7 @@ To view help
 ```
 ffmpeg --help
 ```
+To compress ffmpeg source to .tar file
+```
+tar -zcvf ffmpeg.tar.gz ffmpeg
+```
