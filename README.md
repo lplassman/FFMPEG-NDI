@@ -19,7 +19,7 @@ git clone https://github.com/lplassman/FFMPEG-NDI.git
 Clone the FFMPEG repository and `cd` into it
 
 ```
-git clone https://git.ffmpeg.org/ffmpeg.git
+git clone https://git.ffmpeg.org/ffmpeg.git && cd ffmpeg
 ```
 
 Checkout 4.4 or later version of FFMPEG
