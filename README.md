@@ -99,6 +99,10 @@ Monitor a NDI stream
 ```
 ffplay -fs -alwaysontop -fflags nobuffer -f libndi_newtek -bandwidth 0 -i 'NDI-SOURCE (Stream 1)'
 ```
+Monitor a NDI stream (low latency)
+```
+ffplay -fs -alwaysontop -fflags nobuffer -flags low_delay -framedrop -analyzeduration 0 -max_probe_packets 1 -max_delay 0 -probesize 100000 -f libndi_newtek -bandwidth 0 -i 'NDI-SOURCE (Stream 1)'
+```
 
 The bandwidth argument can accept a few options when receiving:
 - 0 = High Bandwidth
