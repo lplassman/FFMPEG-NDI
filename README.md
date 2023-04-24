@@ -26,6 +26,10 @@ Checkout 4.4 or later version of FFMPEG
 ```
 git checkout n5.1
 ```
+### Apply Generic GitHub Email
+```
+git config user.email "you@example.com"
+```
 ### Apply Patch to revert changes when NDI was removed from FFMPEG
 ```
 sudo git am ../FFMPEG-NDI/libndi.patch
